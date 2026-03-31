@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LTK Energy Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #f0f2f5;
+    --surface:   #ffffff;
+    --surface2:  #f5f6fa;
+    --border:    #dde1ea;
+    --accent:    #1a56db;
+    --accent2:   #d97706;
+    --accent3:   #059669;
+    --accent4:   #dc2626;
+    --text:      #1e2535;
+    --text-muted:#6b7280;
+    --text-dim:  #9ca3af;
+    --header-bg: #1e3a5f;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Kanit',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header {
+    background: var(--header-bg);
+    padding: 0 28px;
+    display: flex; align-items: center; gap: 16px;
+    height: 60px; position: sticky; top:0; z-index:100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .logo-box {
+    width:36px; height:36px;
+    background: linear-gradient(135deg,#2563eb,#1d4ed8);
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-size:17px; color:#fff; flex-shrink:0; border:1px solid rgba(255,255,255,0.2);
+  }
+  .header-title { flex:1; }
+  .header-title h1 { font-size:15px; font-weight:600; color:#fff; letter-spacing:.4px; }
+  .header-title p  { font-size:11px; color:rgba(255,255,255,0.5); font-weight:300; }
+  .header-date     { font-size:11px; color:rgba(255,255,255,0.45); }
+
+  .nav {
+    background:#fff; border-bottom:1px solid var(--border);
+    padding:0 28px; display:flex; gap:2px;
+  }
+  .nav-tab {
+    padding:11px 20px; font-size:13px; font-weight:500;
+    font-family:'Kanit',sans-serif; color:var(--text-muted);
+    background:transparent; border:none; cursor:pointer;
+    border-bottom:3px solid transparent; transition:all .2s;
+    position:relative; top:1px;
+  }
+  .nav-tab:hover { color:var(--text); }
+  .nav-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .page { display:none; padding:12px 20px; }
+  .page.active { display:block; }
+
+  .filter-bar {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:7px 14px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);
+  }
+  .filter-label { font-size:11.5px; color:var(--text-muted); white-space:nowrap; font-weight:500; }
+  .filter-select {
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); padding:4px 8px; border-radius:5px;
+    font-family:'Kanit',sans-serif; font-size:11.5px; cursor:pointer; outline:none;
+  }
+  .filter-select:focus { border-color:var(--accent); }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+  .kpi-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:10px 14px;
+    position:relative; overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:8px 8px 0 0; }
+  .kpi-card:nth-child(1)::before { background:linear-gradient(90deg,#1a56db,#60a5fa); }
+  .kpi-card:nth-child(2)::before { background:linear-gradient(90deg,#059669,#34d399); }
+  .kpi-card:nth-child(3)::before { background:linear-gradient(90deg,#d97706,#fbbf24); }
+  .kpi-card:nth-child(4)::before { background:linear-gradient(90deg,#7c3aed,#a78bfa); }
+  .kpi-label { font-size:10.5px; color:var(--text-muted); margin-bottom:3px; }
+  .kpi-value { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.5px; }
+  .kpi-unit  { font-size:10px; color:var(--text-dim); margin-top:1px; }
+
+  .chart-box {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.05);
+  }
+  .chart-title {
+    font-size:10.5px; font-weight:600; color:var(--text-muted);
+    margin-bottom:7px; display:flex; align-items:center; gap:5px;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+  canvas { max-height:260px; }
+
+  .building-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+  table { width:100%; border-collapse:collapse; font-size:11.5px; }
+  th {
+    background:var(--surface2); color:var(--text-muted); padding:6px 10px;
+    text-align:left; font-weight:600; white-space:nowrap;
+    border-bottom:2px solid var(--border);
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.3px;
+    position:sticky; top:0;
+  }
+  td { padding:4px 8px; border-bottom:1px solid #f0f2f5; white-space:nowrap; }
+  tr:hover td { background:#eff6ff; }
+  .rank { font-weight:700; color:var(--accent); }
+  .bar-inline {
+    display:inline-block; height:5px; border-radius:3px;
+    background:linear-gradient(90deg,#1a56db,#93c5fd);
+    vertical-align:middle; margin-left:4px;
+  }
+
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-box">⚡</div>
+  <div class="header-title">
+    <h1>LTK ENERGY DASHBOARD</h1>
+    <p>สถานีวิจัยลำตะคอง — ระบบติดตามการใช้พลังงานไฟฟ้า</p>
+  </div>
+  <div class="header-date" id="headerDate"></div>
+</div>
+
+<div class="nav">
+  <button class="nav-tab active" onclick="showPage('overview',this)">📊 Overview</button>
+  <button class="nav-tab" onclick="showPage('building',this)">🏢 Building</button>
+</div>
+
+<!-- PAGE: OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div class="filter-bar">
+    <span class="filter-label">ปีงบประมาณ</span>
+    <select class="filter-select" id="fyFilter" onchange="updateOverview()"><option value="all">ทั้งหมด</option></select>
+    <span class="filter-label" style="margin-left:10px">เดือน</span>
+    <select class="filter-select" id="monthFilter" onchange="updateOverview()"><option value="all">ทั้งหมด</option></select>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">การใช้พลังงานรวม</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-unit">kWh</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">เฉลี่ยต่อเดือน</div>
+      <div class="kpi-value" id="kpi-avg">—</div>
+      <div class="kpi-unit">kWh / เดือน</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">อาคารใช้ไฟสูงสุด</div>
+      <div class="kpi-value" id="kpi-topbld" style="font-size:14px;font-weight:600;margin-top:3px;">—</div>
+      <div class="kpi-unit" id="kpi-topbld-val">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">จำนวนเดือนที่บันทึก</div>
+      <div class="kpi-value" id="kpi-months">—</div>
+      <div class="kpi-unit">เดือน</div>
+    </div>
+  </div>
+
+
+
+  <!--
+    Layout 3 ส่วน:
+    ┌─────────────────────┬──────────────────────┐
+    │  1. Bar รายเดือน   │                      │
+    ├─────────────────────┤  2. SVG Bar อาคาร    │
+    │  3. Donut + Legend  │     (ยาวเต็มขวา)     │
+    └─────────────────────┴──────────────────────┘
+  -->
+  <div style="display:grid; grid-template-columns:52% 48%; grid-template-rows:48% 52%; gap:10px; height:580px;">
+
+    <!-- 1. Summary of Energy (kWh) on Month — ซ้ายบน -->
+    <div class="chart-box" style="grid-column:1; grid-row:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="chart-title">📈 Summary of Energy (kWh) on Month</div>
+      <div style="flex:1; min-height:0; position:relative;">
+        <canvas id="comboChart" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+      </div>
+    </div>
+
+    <!-- 2. Energy (kWh) on Building — ขวาทั้งหมด (span 2 rows) -->
+    <div class="chart-box" style="grid-column:2; grid-row:1/3; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="chart-title">🏢 Energy (kWh) on Building</div>
+      <div id="svgBarContainer" style="flex:1; min-height:0; overflow:hidden;"></div>
+    </div>
+
+    <!-- 3. Energy (%) on Building — ซ้ายล่าง (Donut + Legend) -->
+    <div class="chart-box" style="grid-column:1; grid-row:2; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="chart-title">🍩 Energy (%) on Building</div>
+      <div style="flex:1; min-height:0; display:flex; gap:10px; overflow:hidden;">
+
+        <!-- Donut canvas -->
+        <div style="flex:0 0 180px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="donutChart" style="max-height:100%; max-width:180px;"></canvas>
+        </div>
+
+        <!-- Legend scroll -->
+        <div style="flex:1; min-width:0; overflow-y:auto; padding:2px 0;" id="donutLegend"></div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PAGE: BUILDING -->
+<div class="page" id="page-building">
+
+  <!-- Filter row 1: FY + View mode -->
+  <div class="filter-bar" style="margin-bottom:8px;">
+    <span class="filter-label">ปีงบประมาณ</span>
+    <select class="filter-select" id="fyFilter2" onchange="updateBuilding()"><option value="all">ทั้งหมด</option></select>
+
+    <span class="filter-label" style="margin-left:10px">มุมมอง</span>
+    <select class="filter-select" id="viewMode" onchange="updateBuilding()">
+      <option value="total">รวมรายปีงบประมาณ</option>
+      <option value="monthly">เปรียบเทียบรายเดือน</option>
+    </select>
+
+    <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+      <button onclick="selectAllBuildings(true)"  style="font-family:Kanit,sans-serif;font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;background:var(--accent);color:#fff;cursor:pointer;">เลือกทั้งหมด</button>
+      <button onclick="selectAllBuildings(false)" style="font-family:Kanit,sans-serif;font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;background:var(--surface2);color:var(--text-muted);cursor:pointer;">ยกเลิก</button>
+    </div>
+  </div>
+
+  <!-- Filter row 2: Building toggle chips -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+    <div style="font-size:11px;color:var(--text-muted);font-weight:500;margin-bottom:6px;">เลือกอาคารที่ต้องการเปรียบเทียบ</div>
+    <div id="bldChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+
+  <div class="building-grid" style="margin-bottom:14px;">
+    <div class="chart-box">
+      <div class="chart-title">📊 Summary of Energy on Building</div>
+      <canvas id="bldColumnChart" style="max-height:320px;"></canvas>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">🥧 Percent of Energy on Building</div>
+      <canvas id="bldPieChart" style="max-height:320px;"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-title">📋 รายละเอียดการใช้พลังงานรายอาคาร</div>
+    <div style="overflow:auto;">
+      <table>
+        <thead><tr>
+          <th>#</th><th>อาคาร</th>
+          <th style="text-align:right;">พลังงานรวม (kWh)</th>
+          <th style="text-align:right;">สัดส่วน (%)</th><th>กราฟ</th>
+        </tr></thead>
+        <tbody id="bldTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const buildings = {
+  'B-01':'ระบบผลิตประปา','B-02':'โรงสูบน้ำแปลงเกษตร','B-03':'อาคารเรือนกระจก 1',
+  'B-04':'อาคาร สนง.','B-05':'อาคารแลป 1','B-06':'อาคารห้องเย็น',
+  'B-07':'อาคารศูนย์เรียนรู้','B-08':'หอพักนักวิจัย A','B-09':'หอพักนักวิจัย B',
+  'B-10':'อาคารเรือนกระจก 2','B-11':'อาคารวัสดุ','B-12':'อาคารคัดแยกขยะ',
+  'B-13':'อาคาร PASMA','B-14':'EV'
+};
+const bldCodes = Object.keys(buildings);
+const bldKeys  = ['B01','B02','B03','B04','B05','B06','B07','B08','B09','B10','B11','B12','B13','B14'];
+
+const rawData = [
+  {d:'2023-09',B01:1748.39,B02:383.5,B03:3432.2,B04:2154.46,B05:8294.2,B06:32745,B07:5474.1,B08:0,B09:0,B10:7553.8,B11:1370.1,B12:13.745,B13:266.51,B14:398},
+  {d:'2023-10',B01:2087.6,B02:941.4,B03:3373.7,B04:2550.1,B05:8267,B06:33397,B07:4450,B08:3680,B09:4340,B10:7271,B11:2168.6,B12:23.735,B13:837.85,B14:738.6},
+  {d:'2023-11',B01:1976.8,B02:357.26,B03:4135.2,B04:2366,B05:9522,B06:30143,B07:4454,B08:4080,B09:2830,B10:5795,B11:2861.4,B12:26.513,B13:728.4,B14:608},
+  {d:'2023-12',B01:2945.7,B02:2301,B03:3207,B04:1523.7,B05:7739,B06:24580,B07:6846,B08:2180,B09:2011,B10:4864,B11:2275.8,B12:3.723,B13:574.8,B14:743.4},
+  {d:'2024-01',B01:1948.7,B02:2488.1,B03:4284,B04:1667.7,B05:9539,B06:31150,B07:5160,B08:2790,B09:1324,B10:5120,B11:1851.5,B12:3.479,B13:1192.6,B14:676.5},
+  {d:'2024-02',B01:1390,B02:2466.7,B03:4254,B04:2021,B05:9140,B06:24060,B07:7770,B08:3380,B09:1324,B10:5343,B11:2257.2,B12:13.726,B13:9458,B14:704.6},
+  {d:'2024-03',B01:1452,B02:718.8,B03:5518,B04:1881,B05:10586,B06:26300,B07:6035,B08:3260,B09:3722,B10:5901,B11:2862.1,B12:23.02,B13:2249.9,B14:917.2},
+  {d:'2024-04',B01:2006,B02:1845.1,B03:4731,B04:1849,B05:9686,B06:18540,B07:6439,B08:3430,B09:4180,B10:5923,B11:3534.2,B12:30.89,B13:1954.5,B14:677.5},
+  {d:'2024-05',B01:1576,B02:202,B03:4579,B04:2144,B05:10960,B06:27600,B07:6078,B08:3400,B09:1894,B10:5806,B11:3427.6,B12:33.85,B13:1808.7,B14:744.4},
+  {d:'2024-06',B01:1900,B02:1135,B03:5229,B04:2815,B05:9667,B06:29780,B07:4365,B08:2990,B09:1679,B10:8386,B11:4767,B12:19.2,B13:1105,B14:652},
+  {d:'2024-07',B01:1613,B02:487,B03:4636,B04:1832,B05:9099,B06:28910,B07:6195,B08:1350,B09:1352,B10:8704,B11:3811.2,B12:22.5,B13:1181,B14:691.4},
+  {d:'2024-08',B01:1813,B02:1177,B03:5474,B04:2328,B05:10130,B06:29610,B07:5927,B08:1990,B09:1536,B10:9528,B11:4924,B12:18,B13:1838,B14:749},
+  {d:'2024-09',B01:1438,B02:560,B03:6274,B04:1889,B05:8180,B06:28360,B07:5079,B08:1950,B09:1341,B10:9297,B11:5896.7,B12:51.76,B13:1542,B14:846.3},
+  {d:'2024-10',B01:1674,B02:1211,B03:6901,B04:1652,B05:9730,B06:27080,B07:3158,B08:2110,B09:1387,B10:10594,B11:3238.4,B12:3.16,B13:1012,B14:531.6},
+  {d:'2024-11',B01:1811,B02:1719,B03:7256,B04:1546,B05:8400,B06:24310,B07:4596,B08:2064,B09:1047,B10:12220,B11:2972.3,B12:3.93,B13:1877,B14:503.7},
+  {d:'2024-12',B01:1875,B02:1695,B03:6040,B04:974,B05:7540,B06:27660,B07:6047,B08:1340,B09:605,B10:12650,B11:4038.6,B12:1560,B13:1133,B14:555.4},
+  {d:'2025-01',B01:1902,B02:1298,B03:5934,B04:980,B05:8580,B06:23340,B07:5437,B08:1700,B09:535,B10:10620,B11:1939.2,B12:65,B13:3182,B14:971.8},
+  {d:'2025-02',B01:1593,B02:451,B03:6006,B04:1463,B05:7870,B06:22600,B07:1320,B08:1320,B09:952,B10:10910,B11:2768.1,B12:500,B13:1775,B14:651.7},
+  {d:'2025-03',B01:1904,B02:44,B03:6931,B04:2140,B05:8680,B06:20810,B07:2500,B08:1300,B09:1252,B10:11400,B11:5502.9,B12:730,B13:1922,B14:749.1},
+  {d:'2025-04',B01:1569,B02:0,B03:0,B04:1636,B05:9610,B06:24450,B07:2210,B08:3512.3,B09:1399,B10:10760,B11:3055.6,B12:140,B13:1225,B14:708.4},
+  {d:'2025-05',B01:2090,B02:0,B03:5840,B04:1758,B05:9510,B06:30530,B07:2440,B08:1650,B09:1222,B10:9780,B11:4219,B12:0,B13:1144,B14:681},
+  {d:'2025-06',B01:2004,B02:0,B03:5690,B04:1831,B05:10330,B06:30170,B07:3430,B08:1220,B09:1286,B10:10570,B11:4655.1,B12:0,B13:1133,B14:766.6},
+  {d:'2025-07',B01:2261,B02:0,B03:6200,B04:1922,B05:9610,B06:25710,B07:2200,B08:1030,B09:1101,B10:11180,B11:7357.6,B12:0,B13:1512,B14:808.8},
+  {d:'2025-08',B01:2415,B02:0,B03:6410,B04:1617,B05:9280,B06:18745,B07:2200,B08:1010,B09:1365,B10:11050,B11:1086,B12:2,B13:1616,B14:957},
+  {d:'2025-09',B01:2569,B02:0,B03:6570,B04:2159,B05:9050,B06:19570,B07:2200,B08:1200,B09:1146,B10:10170,B11:1851.6,B12:420,B13:1276,B14:813},
+  {d:'2025-10',B01:1893,B02:0,B03:5580,B04:1887,B05:8850,B06:27540,B07:2054,B08:910,B09:1207,B10:8700,B11:8083.7,B12:0,B13:1277,B14:833.4},
+  {d:'2025-11',B01:1825,B02:0,B03:5500,B04:1238,B05:8460,B06:26440,B07:4149.4,B08:1160,B09:785,B10:7260,B11:12524.4,B12:28,B13:1506,B14:914.2},
+  {d:'2025-12',B01:2081,B02:0,B03:4690,B04:2868,B05:7360,B06:30050,B07:2092,B08:780,B09:590,B10:7370,B11:2702,B12:20,B13:1082,B14:8},
+  {d:'2026-01',B01:2186,B02:0,B03:4630,B04:1626,B05:6850,B06:22100,B07:3215,B08:710,B09:611,B10:8770,B11:1270.3,B12:8689,B13:1017,B14:833},
+];
+
+// Professional blue-dominant palette for light theme
+const COLORS=['#1a56db','#059669','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#15803d','#b45309','#6d28d9','#0369a1','#9f1239','#065f46','#92400e'];
+const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function getFY(d){const[y,m]=d.split('-').map(Number);return m>=10?y+1:y;}
+function getRowTotal(r){return bldKeys.reduce((s,k)=>s+(r[k]||0),0);}
+function fmt(n){if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return Math.round(n).toLocaleString();}
+function fmtFull(n){return Math.round(n).toLocaleString('th');}
+function fmtShort(n){if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1000)return(n/1000).toFixed(2)+'k';return Math.round(n).toString();}
+function getFYSorted(data){const o=[10,11,12,1,2,3,4,5,6,7,8,9];return[...data].sort((a,b)=>o.indexOf(+a.d.split('-')[1])-o.indexOf(+b.d.split('-')[1]));}
+
+const allFYs=[...new Set(rawData.map(r=>getFY(r.d)))].sort();
+['fyFilter','fyFilter2'].forEach(id=>{
+  const s=document.getElementById(id);
+  allFYs.forEach(fy=>{const o=document.createElement('option');o.value=fy;o.textContent=`ปีงบประมาณ ${fy}`;s.appendChild(o);});
+});
+monthNames.forEach((n,i)=>{const o=document.createElement('option');o.value=i+1;o.textContent=n;document.getElementById('monthFilter').appendChild(o);});
+document.getElementById('headerDate').textContent=`อัปเดต: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`;
+
+// ── Building chip multi-select ──
+const selectedBuildings = new Set(bldKeys); // default: all selected
+
+function initBldChips(){
+  const wrap = document.getElementById('bldChips');
+  wrap.innerHTML = '';
+  bldKeys.forEach((k,i)=>{
+    const code = bldCodes[i];
+    const name = buildings[code];
+    const color = COLORS[i % COLORS.length];
+    const chip = document.createElement('button');
+    chip.dataset.key = k;
+    chip.style.cssText = `font-family:Kanit,sans-serif;font-size:10.5px;padding:3px 10px;border-radius:20px;cursor:pointer;transition:all .15s;white-space:nowrap;border:1.5px solid ${color};`;
+    chip.textContent = name;
+    chip.onclick = ()=>{ toggleChip(k, chip, color); };
+    setChipActive(chip, true, color);
+    wrap.appendChild(chip);
+  });
+}
+
+function setChipActive(chip, active, color){
+  if(active){
+    chip.style.background = color;
+    chip.style.color = '#fff';
+  } else {
+    chip.style.background = '#fff';
+    chip.style.color = '#6b7280';
+  }
+}
+
+function toggleChip(k, chip, color){
+  if(selectedBuildings.has(k)){
+    if(selectedBuildings.size <= 1) return; // keep at least 1
+    selectedBuildings.delete(k);
+    setChipActive(chip, false, color);
+  } else {
+    selectedBuildings.add(k);
+    setChipActive(chip, true, color);
+  }
+  updateBuilding();
+}
+
+function selectAllBuildings(sel){
+  const chips = document.querySelectorAll('#bldChips button');
+  chips.forEach((chip,i)=>{
+    const k = chip.dataset.key;
+    const color = COLORS[i % COLORS.length];
+    if(sel){ selectedBuildings.add(k); setChipActive(chip, true, color); }
+    else {
+      if(i===0){ selectedBuildings.add(k); setChipActive(chip, true, color); }
+      else { selectedBuildings.delete(k); setChipActive(chip, false, color); }
+    }
+  });
+  updateBuilding();
+}
+
+initBldChips();
+
+let comboChart,donutChart,colChart,pieChart;
+const SC={ticks:{color:'#6b7280',font:{family:'Kanit',size:10}},grid:{color:'#e5e7eb'}};
+const SX={ticks:{color:'#374151',font:{family:'Kanit',size:10}},grid:{display:false}};
+
+function getFiltered(){
+  const fy=document.getElementById('fyFilter').value,mo=document.getElementById('monthFilter').value;
+  return rawData.filter(r=>(fy==='all'||getFY(r.d)==fy)&&(mo==='all'||+r.d.split('-')[1]==mo));
+}
+
+function updateOverview(){
+  const fy=document.getElementById('fyFilter').value,mo=document.getElementById('monthFilter').value;
+  const data=getFiltered();if(!data.length)return;
+
+  const total=data.reduce((s,r)=>s+getRowTotal(r),0);
+  document.getElementById('kpi-total').textContent=fmt(total);
+  document.getElementById('kpi-avg').textContent=fmt(total/data.length);
+  document.getElementById('kpi-months').textContent=data.length;
+  const kT=bldKeys.map(k=>({k,v:data.reduce((s,r)=>s+(r[k]||0),0)})).sort((a,b)=>b.v-a.v);
+  const ti=bldKeys.indexOf(kT[0].k);
+  document.getElementById('kpi-topbld').textContent=bldCodes[ti];
+  document.getElementById('kpi-topbld-val').textContent=`${buildings[bldCodes[ti]]} — ${fmt(kT[0].v)} kWh`;
+
+  const dd=(fy!=='all'&&mo==='all')?getFYSorted(data):data;
+  const labels=dd.map(r=>{const[y,m]=r.d.split('-');return monthNames[+m-1]+' '+(+y+543).toString().slice(2);});
+  const totals=dd.map(r=>getRowTotal(r));
+
+  // Bar chart
+  if(comboChart)comboChart.destroy();
+  comboChart=new Chart(document.getElementById('comboChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'kWh',data:totals,backgroundColor:'rgba(26,86,219,0.72)',borderColor:'#1a56db',borderWidth:1,borderRadius:4}]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmtFull(ctx.raw)} kWh`}}},
+      scales:{y:{...SC},x:{...SC,ticks:{...SC.ticks,maxRotation:45}}},
+      animation:{onComplete:function(){
+        const ch=this,cx=ch.ctx;cx.save();
+        cx.font='500 9px Kanit,sans-serif';cx.fillStyle='#374151';cx.textAlign='center';cx.textBaseline='bottom';
+        ch.data.datasets.forEach((ds,di)=>{ch.getDatasetMeta(di).data.forEach((bar,i)=>{
+          const v=ds.data[i];if(v==null)return;cx.fillText(fmt(v),bar.x,bar.y-2);
+        });});cx.restore();
+      }}
+    }
+  });
+
+  // Donut
+  const bT=bldKeys.map(k=>({k,v:data.reduce((s,r)=>s+(r[k]||0),0)})).sort((a,b)=>b.v-a.v);
+  const gT=bT.reduce((s,x)=>s+x.v,0);
+  if(donutChart)donutChart.destroy();
+  donutChart=new Chart(document.getElementById('donutChart'),{
+    type:'doughnut',
+    data:{labels:bT.map(x=>buildings[bldCodes[bldKeys.indexOf(x.k)]]),datasets:[{data:bT.map(x=>x.v),backgroundColor:COLORS,borderWidth:2,borderColor:'#fff',hoverOffset:6}]},
+    options:{responsive:true,cutout:'58%',
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>{const p=gT>0?(ctx.raw/gT*100).toFixed(1):'0.0';return`${ctx.label}: ${fmtFull(ctx.raw)} kWh (${p}%)`;}}}}
+    }
+  });
+
+  // SVG Bar
+  const bN=bT.map(x=>buildings[bldCodes[bldKeys.indexOf(x.k)]]);
+  const bV=bT.map(x=>x.v),mV=bV[0]||1;
+  const ct=document.getElementById('svgBarContainer');
+  const W=ct.clientWidth||360,H=ct.clientHeight||340;
+  const pL=132,pR=70,pT=4,pB=4;
+  const rH=(H-pT-pB)/bN.length,bH=Math.max(9,rH*0.52),cW=W-pL-pR;
+  let svg='';
+  bT.forEach((x,i)=>{
+    const nm=bN[i],v=bV[i],col=COLORS[i%COLORS.length];
+    const bW=v>0?(v/mV)*cW:0,y=pT+i*rH,bY=y+(rH-bH)/2,mY=bY+bH/2;
+    if(i%2===0)svg+=`<rect x="0" y="${y.toFixed(1)}" width="${W}" height="${rH.toFixed(1)}" fill="rgba(0,0,0,0.016)"/>`;
+    svg+=`<rect x="${pL}" y="${bY.toFixed(1)}" width="${bW.toFixed(1)}" height="${bH.toFixed(1)}" rx="${Math.min(3,bH/2)}" fill="${col}" opacity="0.8"/>`;
+    svg+=`<text x="${pL-7}" y="${mY.toFixed(1)}" text-anchor="end" dominant-baseline="middle" fill="#374151" font-family="Kanit,sans-serif" font-size="10.5">${nm}</text>`;
+    svg+=`<text x="${(pL+bW+5).toFixed(1)}" y="${mY.toFixed(1)}" dominant-baseline="middle" fill="#374151" font-family="Kanit,sans-serif" font-size="10" font-weight="500">${fmtShort(v)} kWh</text>`;
+  });
+  ct.innerHTML=`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+
+  // Donut legend — rich: rank + dot + name + bar + kWh + %
+  const lgEl=document.getElementById('donutLegend'); lgEl.innerHTML='';
+  bT.forEach((x,i)=>{
+    const nm=bN[i],v=bV[i],p=gT>0?(v/gT*100).toFixed(1):'0.0',col=COLORS[i%COLORS.length];
+    const barPct=gT>0?Math.round((v/bV[0])*100):0;
+    const row=document.createElement('div');
+    row.style.cssText='padding:4px 2px;border-bottom:1px solid #f3f4f6;';
+    row.innerHTML=`
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+        <span style="font-size:9px;font-weight:700;color:${col};width:14px;text-align:center;flex-shrink:0;">${i+1}</span>
+        <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block;"></span>
+        <span style="font-size:10px;color:#374151;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nm}</span>
+        <span style="font-size:10px;font-weight:600;color:#1e2535;flex-shrink:0;white-space:nowrap;">${fmtShort(v)} kWh</span>
+        <span style="font-size:9.5px;color:#6b7280;width:34px;text-align:right;flex-shrink:0;">${p}%</span>
+      </div>
+      <div style="margin-left:19px;background:#e5e7eb;border-radius:2px;height:4px;overflow:hidden;">
+        <div style="width:${barPct}%;height:100%;background:${col};border-radius:2px;opacity:0.75;"></div>
+      </div>`;
+    lgEl.appendChild(row);
+  });
+}
+
+function updateBuilding(){
+  const fy   = document.getElementById('fyFilter2').value;
+  const mode = document.getElementById('viewMode').value;
+  const keys = bldKeys.filter(k => selectedBuildings.has(k));
+  if(!keys.length) return;
+
+  const fyOrder = [10,11,12,1,2,3,4,5,6,7,8,9];
+  let data = rawData.filter(r => fy==='all' || getFY(r.d)==fy);
+
+  // color mapping: use consistent color per building key
+  const keyColorMap = {};
+  bldKeys.forEach((k,i)=>{ keyColorMap[k]=COLORS[i%COLORS.length]; });
+
+  if(mode==='monthly'){
+    const sortedData = [...data].sort((a,b)=>fyOrder.indexOf(+a.d.split('-')[1])-fyOrder.indexOf(+b.d.split('-')[1]));
+    const labels = sortedData.map(r=>{const[y,m]=r.d.split('-');return monthNames[+m-1]+' '+(+y+543).toString().slice(2);});
+    const datasets = keys.map(k=>({
+      label: buildings[bldCodes[bldKeys.indexOf(k)]],
+      data: sortedData.map(r=>r[k]||0),
+      backgroundColor: keyColorMap[k],
+      borderRadius: 3, borderWidth: 0,
+    }));
+
+    if(colChart) colChart.destroy();
+    colChart = new Chart(document.getElementById('bldColumnChart'),{
+      type:'bar', data:{labels, datasets},
+      options:{responsive:true,
+        plugins:{
+          legend:{display:keys.length>1,position:'bottom',labels:{color:'#6b7280',font:{family:'Kanit',size:10},boxWidth:10,padding:8}},
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtFull(ctx.raw)} kWh`}}
+        },
+        scales:{
+          y:{...SC,title:{display:true,text:'kWh',color:'#6b7280',font:{family:'Kanit',size:11}}},
+          x:{...SX,ticks:{...SX.ticks,maxRotation:45}}
+        }
+      }
+    });
+
+    const bTotals = keys.map(k=>({k,name:buildings[bldCodes[bldKeys.indexOf(k)]],v:data.reduce((s,r)=>s+(r[k]||0),0),color:keyColorMap[k]})).sort((a,b)=>b.v-a.v);
+    const total = bTotals.reduce((s,x)=>s+x.v,0);
+
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(document.getElementById('bldPieChart'),{
+      type:'pie',
+      data:{labels:bTotals.map(x=>x.name),datasets:[{data:bTotals.map(x=>x.v),backgroundColor:bTotals.map(x=>x.color),borderWidth:2,borderColor:'#fff',hoverOffset:6}]},
+      options:{responsive:true,plugins:{
+        legend:{position:'right',labels:{color:'#6b7280',font:{family:'Kanit',size:10},boxWidth:10,padding:6}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${(ctx.raw/total*100).toFixed(1)}%`}}
+      }}
+    });
+
+    const tb=document.getElementById('bldTableBody'); tb.innerHTML='';
+    const mV=bTotals[0]?.v||1;
+    bTotals.forEach((x,i)=>{
+      const p=total>0?(x.v/total*100):0;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="rank" style="color:${x.color};">${i+1}</td><td>${x.name}</td>
+        <td style="text-align:right;">${x.v.toLocaleString('th',{maximumFractionDigits:0})}</td>
+        <td style="text-align:right;">${p.toFixed(1)}%</td>
+        <td><span class="bar-inline" style="width:${Math.round((x.v/mV)*100)}px;background:${x.color};"></span></td>`;
+      tb.appendChild(tr);
+    });
+
+  } else {
+    const bT = keys.map(k=>{
+      const c=bldCodes[bldKeys.indexOf(k)];
+      return{k,name:buildings[c],color:keyColorMap[k],v:data.reduce((s,r)=>s+(r[k]||0),0)};
+    }).sort((a,b)=>b.v-a.v);
+    const total = bT.reduce((s,x)=>s+x.v,0);
+
+    if(colChart) colChart.destroy();
+    colChart = new Chart(document.getElementById('bldColumnChart'),{
+      type:'bar',
+      data:{labels:bT.map(x=>x.name),datasets:[{label:'kWh',data:bT.map(x=>x.v),backgroundColor:bT.map(x=>x.color),borderRadius:5,borderWidth:0}]},
+      options:{responsive:true,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmtFull(ctx.raw)} kWh`}}},
+        scales:{
+          y:{...SC,title:{display:true,text:'kWh',color:'#6b7280',font:{family:'Kanit',size:11}}},
+          x:{...SX,ticks:{...SX.ticks,maxRotation:40,font:{...SX.ticks.font,size:9}}}
+        }
+      }
+    });
+
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(document.getElementById('bldPieChart'),{
+      type:'pie',
+      data:{labels:bT.map(x=>x.name),datasets:[{data:bT.map(x=>x.v),backgroundColor:bT.map(x=>x.color),borderWidth:2,borderColor:'#fff',hoverOffset:6}]},
+      options:{responsive:true,plugins:{
+        legend:{position:'right',labels:{color:'#6b7280',font:{family:'Kanit',size:10},boxWidth:10,padding:6}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${(ctx.raw/total*100).toFixed(1)}%`}}
+      }}
+    });
+
+    const tb=document.getElementById('bldTableBody'); tb.innerHTML='';
+    const mV=bT[0]?.v||1;
+    bT.forEach((x,i)=>{
+      const p=total>0?(x.v/total*100):0;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="rank" style="color:${x.color};">${i+1}</td><td>${x.name}</td>
+        <td style="text-align:right;">${x.v.toLocaleString('th',{maximumFractionDigits:0})}</td>
+        <td style="text-align:right;">${p.toFixed(1)}%</td>
+        <td><span class="bar-inline" style="width:${Math.round((x.v/mV)*100)}px;background:${x.color};"></span></td>`;
+      tb.appendChild(tr);
+    });
+  }
+}
+
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');btn.classList.add('active');
+  if(id==='building')updateBuilding();
+}
+
+window.addEventListener('resize',()=>{if(document.getElementById('page-overview').classList.contains('active'))updateOverview();});
+updateOverview();
+</script>
+</body>
+</html>
